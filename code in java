@@ -1,0 +1,275 @@
+import java.awt.*;
+import java.awt.event.*;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import javax.swing.*;
+
+public class MedicationApp {
+
+    // Database connection URL
+    private static final String DB_URL = "jdbc:sqlite:medicationDB.db";
+    private static HashMap<String, String> users = new HashMap<>();
+    private static HashMap<String, Double> availableMedicines = new HashMap<>();
+    private static HashMap<String, Integer> cart = new HashMap<>();
+
+    public static void main(String[] args) {
+        setupDatabase();
+        initializeMedicines();
+        createLoginFrame();
+    }
+
+    // Setup SQLite Database
+    private static void setupDatabase() {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement stmt = conn.prepareStatement(
+                "CREATE TABLE IF NOT EXISTS DeliveryDetails (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, " +
+                "address TEXT NOT NULL, contact TEXT NOT NULL, paymentMethod TEXT NOT NULL)")) {
+            stmt.executeUpdate();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Database Error: " + ex.getMessage());
+        }
+    }
+
+    // Initialize medicine data
+    private static void initializeMedicines() {
+        availableMedicines.put("Paracetamol", 10.0);
+        availableMedicines.put("Aspirin", 8.5);
+        availableMedicines.put("Ibuprofen", 12.0);
+        availableMedicines.put("Cough Syrup", 15.0);
+        // ... Add more medicines as needed
+    }
+
+    // Create Login/Signup Frame
+    private static void createLoginFrame() {
+        JFrame loginFrame = new JFrame("Login/Signup - Online Medication Shopping System");
+        loginFrame.setSize(500, 400);
+        loginFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        loginFrame.setLocationRelativeTo(null);
+
+        JPanel loginPanel = new JPanel();
+        loginPanel.setLayout(null);
+        loginPanel.setBackground(new Color(173, 216, 230));
+        loginFrame.add(loginPanel);
+
+        JLabel welcomeLabel = new JLabel("Welcome to the Medication Shopping System", JLabel.CENTER);
+        welcomeLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        welcomeLabel.setBounds(50, 20, 400, 30);
+        loginPanel.add(welcomeLabel);
+
+        JLabel userLabel = new JLabel("Username:");
+        userLabel.setBounds(100, 80, 80, 25);
+        loginPanel.add(userLabel);
+
+        JTextField userText = new JTextField(20);
+        userText.setBounds(200, 80, 165, 25);
+        loginPanel.add(userText);
+
+        JLabel passwordLabel = new JLabel("Password:");
+        passwordLabel.setBounds(100, 120, 80, 25);
+        loginPanel.add(passwordLabel);
+
+        JPasswordField passwordText = new JPasswordField(20);
+        passwordText.setBounds(200, 120, 165, 25);
+        loginPanel.add(passwordText);
+
+        JButton signupButton = new JButton("Sign Up");
+        signupButton.setBounds(100, 180, 100, 30);
+        loginPanel.add(signupButton);
+
+        JButton loginButton = new JButton("Login");
+        loginButton.setBounds(250, 180, 100, 30);
+        loginPanel.add(loginButton);
+
+        signupButton.addActionListener(e -> {
+            String username = userText.getText();
+            String password = String.valueOf(passwordText.getPassword());
+            if (!username.isEmpty() && !password.isEmpty() && !users.containsKey(username)) {
+                users.put(username, password);
+                JOptionPane.showMessageDialog(null, "Signup Successful!");
+                userText.setText("");
+                passwordText.setText("");
+            } else {
+                JOptionPane.showMessageDialog(null, "Username already exists or invalid input.");
+            }
+        });
+
+        loginButton.addActionListener(e -> {
+            String username = userText.getText();
+            String password = String.valueOf(passwordText.getPassword());
+            if (users.containsKey(username) && users.get(username).equals(password)) {
+                JOptionPane.showMessageDialog(null, "Login Successful!");
+                loginFrame.dispose();
+                openMainApplication();
+            } else {
+                JOptionPane.showMessageDialog(null, "Invalid Username or Password.");
+            }
+        });
+
+        loginFrame.setVisible(true);
+    }
+
+    // Open Main Application after login
+    private static void openMainApplication() {
+        JFrame mainAppFrame = new JFrame("Medication Shopping System");
+        mainAppFrame.setSize(600, 500);
+        mainAppFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        mainAppFrame.setLocationRelativeTo(null);
+
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBackground(new Color(173, 216, 230));
+        mainAppFrame.add(mainPanel);
+
+        JLabel titleLabel = new JLabel("Available Medicines", JLabel.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
+        mainPanel.add(titleLabel, BorderLayout.NORTH);
+
+        JPanel medicinePanel = new JPanel(new GridLayout(availableMedicines.size() + 1, 4, 10, 10));
+        medicinePanel.add(new JLabel("Medicine Name"));
+        medicinePanel.add(new JLabel("Cost"));
+        medicinePanel.add(new JLabel("Quantity"));
+        medicinePanel.add(new JLabel("Add to Cart"));
+
+        for (String medicine : availableMedicines.keySet()) {
+            medicinePanel.add(new JLabel(medicine));
+            medicinePanel.add(new JLabel("₹" + availableMedicines.get(medicine)));
+
+            JComboBox<Integer> quantityBox = new JComboBox<>();
+            for (int i = 1; i <= 10; i++) quantityBox.addItem(i);
+            medicinePanel.add(quantityBox);
+
+            JButton addButton = new JButton("Add to Cart");
+            addButton.addActionListener(e -> {
+                int quantity = (int) quantityBox.getSelectedItem();
+                cart.put(medicine, quantity);
+                JOptionPane.showMessageDialog(null, quantity + " units of " + medicine + " added to cart.");
+            });
+            medicinePanel.add(addButton);
+        }
+
+        JScrollPane scrollPane = new JScrollPane(medicinePanel);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        mainPanel.add(scrollPane, BorderLayout.CENTER);
+
+        JButton viewCartButton = new JButton("View Cart");
+        viewCartButton.addActionListener(e -> viewCart());
+        mainPanel.add(viewCartButton, BorderLayout.SOUTH);
+
+        mainAppFrame.setVisible(true);
+    }
+
+    // View Cart Summary
+    private static void viewCart() {
+        JFrame cartFrame = new JFrame("Cart Summary");
+        cartFrame.setSize(400, 300);
+        cartFrame.setLocationRelativeTo(null);
+
+        JTextArea cartSummary = new JTextArea(10, 30);
+        cartSummary.setEditable(false);
+        double totalCost = 0;
+
+        for (String item : cart.keySet()) {
+            int quantity = cart.get(item);
+            double cost = availableMedicines.get(item);
+            cartSummary.append(item + " - ₹" + cost + " x " + quantity + " = ₹" + (cost * quantity) + "\n");
+            totalCost += cost * quantity;
+        }
+        cartSummary.append("\nTotal Cost: ₹" + totalCost);
+
+        JButton proceedButton = new JButton("Proceed to Payment");
+        proceedButton.addActionListener(e -> {
+            cartFrame.dispose();
+            openPaymentPage();
+        });
+
+        JPanel cartPanel = new JPanel(new BorderLayout());
+        cartPanel.add(new JScrollPane(cartSummary), BorderLayout.CENTER);
+        cartPanel.add(proceedButton, BorderLayout.SOUTH);
+
+        cartFrame.add(cartPanel);
+        cartFrame.setVisible(true);
+    }
+
+    // Open Payment and Delivery Page
+    private static void openPaymentPage() {
+        JFrame paymentFrame = new JFrame("Payment and Delivery Details");
+        paymentFrame.setSize(500, 400);
+        paymentFrame.setLocationRelativeTo(null);
+
+        JPanel paymentPanel = new JPanel();
+        paymentPanel.setLayout(null);
+        paymentFrame.add(paymentPanel);
+
+        JLabel nameLabel = new JLabel("Name:");
+        nameLabel.setBounds(50, 30, 80, 25);
+        paymentPanel.add(nameLabel);
+
+        JTextField nameText = new JTextField(20);
+        nameText.setBounds(150, 30, 200, 25);
+        paymentPanel.add(nameText);
+
+        JLabel addressLabel = new JLabel("Address:");
+        addressLabel.setBounds(50, 70, 80, 25);
+        paymentPanel.add(addressLabel);
+
+        JTextArea addressText = new JTextArea(3, 20);
+        addressText.setBounds(150, 70, 200, 50);
+        paymentPanel.add(addressText);
+
+        JLabel contactLabel = new JLabel("Contact No:");
+        contactLabel.setBounds(50, 140, 80, 25);
+        paymentPanel.add(contactLabel);
+
+        JTextField contactText = new JTextField(20);
+        contactText.setBounds(150, 140, 200, 25);
+        paymentPanel.add(contactText);
+
+        JLabel paymentLabel = new JLabel("Payment Method:");
+        paymentLabel.setBounds(50, 180, 100, 25);
+        paymentPanel.add(paymentLabel);
+
+        JRadioButton cardOption = new JRadioButton("Card");
+        cardOption.setBounds(150, 180, 60, 25);
+        JRadioButton codOption = new JRadioButton("Cash on Delivery");
+        codOption.setBounds(220, 180, 150, 25);
+        ButtonGroup paymentGroup = new ButtonGroup();
+        paymentGroup.add(cardOption);
+        paymentGroup.add(codOption);
+        paymentPanel.add(cardOption);
+        paymentPanel.add(codOption);
+
+        JButton placeOrderButton = new JButton("Place Order");
+        placeOrderButton.setBounds(150, 240, 150, 30);
+        paymentPanel.add(placeOrderButton);
+
+        placeOrderButton.addActionListener(e -> {
+            String name = nameText.getText();
+            String address = addressText.getText();
+            String contact = contactText.getText();
+            String paymentMethod = cardOption.isSelected() ? "Card" : "Cash on Delivery";
+
+            if (!name.isEmpty() && !address.isEmpty() && !contact.isEmpty()) {
+                try (Connection conn = DriverManager.getConnection(DB_URL);
+                     PreparedStatement stmt = conn.prepareStatement(
+                         "INSERT INTO DeliveryDetails (name, address, contact, paymentMethod) VALUES (?, ?, ?, ?)")) {
+                    stmt.setString(1, name);
+                    stmt.setString(2, address);
+                    stmt.setString(3, contact);
+                    stmt.setString(4, paymentMethod);
+                    stmt.executeUpdate();
+                    JOptionPane.showMessageDialog(null, "Order placed successfully!");
+                    paymentFrame.dispose();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(null, "Order could not be placed. Error: " + ex.getMessage());
+                }
+            } else {
+                JOptionPane.showMessageDialog(null, "Please fill all details.");
+            }
+        });
+
+        paymentFrame.setVisible(true);
+    }
+}
